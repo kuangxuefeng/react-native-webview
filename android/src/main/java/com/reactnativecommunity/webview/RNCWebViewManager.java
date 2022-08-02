@@ -1,5 +1,6 @@
 package com.reactnativecommunity.webview;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -9,8 +10,6 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.Manifest;
-import android.net.http.SslError;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -24,23 +23,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
-import android.webkit.ConsoleMessage;
-import android.webkit.CookieManager;
-import android.webkit.DownloadListener;
 import android.webkit.GeolocationPermissions;
-import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.RenderProcessGoneDetail;
-import android.webkit.SslErrorHandler;
-import android.webkit.PermissionRequest;
-import android.webkit.URLUtil;
-import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -52,11 +37,6 @@ import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 
 import com.facebook.common.logging.FLog;
-import com.facebook.react.modules.core.PermissionAwareActivity;
-import com.facebook.react.modules.core.PermissionListener;
-import com.facebook.react.views.scroll.ScrollEvent;
-import com.facebook.react.views.scroll.ScrollEventType;
-import com.facebook.react.views.scroll.OnScrollDispatchHelper;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.CatalystInstance;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -70,6 +50,8 @@ import com.facebook.react.bridge.WritableNativeMap;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.common.build.ReactBuildConfig;
 import com.facebook.react.module.annotations.ReactModule;
+import com.facebook.react.modules.core.PermissionAwareActivity;
+import com.facebook.react.modules.core.PermissionListener;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
@@ -77,21 +59,43 @@ import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.events.ContentSizeChangeEvent;
 import com.facebook.react.uimanager.events.Event;
 import com.facebook.react.uimanager.events.EventDispatcher;
+import com.facebook.react.views.scroll.OnScrollDispatchHelper;
+import com.facebook.react.views.scroll.ScrollEvent;
+import com.facebook.react.views.scroll.ScrollEventType;
+import com.huifu.h5wrapper.webview.H5WrapperWebView;
+import com.huifu.h5wrapper.webview.base.HFWebChromeClient;
+import com.huifu.h5wrapper.webview.base.HFWebViewClient;
 import com.reactnativecommunity.webview.RNCWebViewModule.ShouldOverrideUrlLoadingLock.ShouldOverrideCallbackState;
-import com.reactnativecommunity.webview.events.TopLoadingErrorEvent;
 import com.reactnativecommunity.webview.events.TopHttpErrorEvent;
+import com.reactnativecommunity.webview.events.TopLoadingErrorEvent;
 import com.reactnativecommunity.webview.events.TopLoadingFinishEvent;
 import com.reactnativecommunity.webview.events.TopLoadingProgressEvent;
 import com.reactnativecommunity.webview.events.TopLoadingStartEvent;
 import com.reactnativecommunity.webview.events.TopMessageEvent;
-import com.reactnativecommunity.webview.events.TopShouldStartLoadWithRequestEvent;
 import com.reactnativecommunity.webview.events.TopRenderProcessGoneEvent;
+import com.reactnativecommunity.webview.events.TopShouldStartLoadWithRequestEvent;
+import com.tencent.smtt.export.external.interfaces.ConsoleMessage;
+import com.tencent.smtt.export.external.interfaces.GeolocationPermissionsCallback;
+import com.tencent.smtt.export.external.interfaces.HttpAuthHandler;
+import com.tencent.smtt.export.external.interfaces.IX5WebChromeClient;
+import com.tencent.smtt.export.external.interfaces.PermissionRequest;
+import com.tencent.smtt.export.external.interfaces.SslError;
+import com.tencent.smtt.export.external.interfaces.SslErrorHandler;
+import com.tencent.smtt.export.external.interfaces.WebResourceRequest;
+import com.tencent.smtt.export.external.interfaces.WebResourceResponse;
+import com.tencent.smtt.sdk.CookieManager;
+import com.tencent.smtt.sdk.DownloadListener;
+import com.tencent.smtt.sdk.URLUtil;
+import com.tencent.smtt.sdk.ValueCallback;
+import com.tencent.smtt.sdk.WebChromeClient;
+import com.tencent.smtt.sdk.WebSettings;
+import com.tencent.smtt.sdk.WebView;
+import com.tencent.smtt.sdk.WebViewClient;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
-import java.lang.IllegalArgumentException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -128,7 +132,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * - canGoForward - boolean, whether it is possible to request GO_FORWARD command
  */
 @ReactModule(name = RNCWebViewManager.REACT_CLASS)
-public class RNCWebViewManager extends SimpleViewManager<WebView> {
+public class RNCWebViewManager extends SimpleViewManager<H5WrapperWebView> {
   private static final String TAG = "RNCWebViewManager";
 
   public static final int COMMAND_GO_BACK = 1;
@@ -184,11 +188,12 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
 
   protected RNCWebView createRNCWebViewInstance(ThemedReactContext reactContext) {
     return new RNCWebView(reactContext);
+//    return new HFWebView(reactContext, null);
   }
 
   @Override
   @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-  protected WebView createViewInstance(ThemedReactContext reactContext) {
+  protected H5WrapperWebView createViewInstance(ThemedReactContext reactContext) {
     RNCWebView webView = createRNCWebViewInstance(reactContext);
     setupWebChromeClient(reactContext, webView);
     reactContext.addLifecycleEventListener(webView);
@@ -605,11 +610,11 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
   public void setMixedContentMode(WebView view, @Nullable String mixedContentMode) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
       if (mixedContentMode == null || "never".equals(mixedContentMode)) {
-        view.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        view.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
       } else if ("always".equals(mixedContentMode)) {
-        view.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        view.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
       } else if ("compatibility".equals(mixedContentMode)) {
-        view.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        view.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
       }
     }
   }
@@ -626,7 +631,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
 
   @ReactProp(name = "allowsFullscreenVideo")
   public void setAllowsFullscreenVideo(
-    WebView view,
+    H5WrapperWebView view,
     @Nullable Boolean allowsFullscreenVideo) {
     mAllowsFullscreenVideo = allowsFullscreenVideo != null && allowsFullscreenVideo;
     setupWebChromeClient((ReactContext)view.getContext(), view);
@@ -653,23 +658,24 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
 
   @ReactProp(name = "forceDarkOn")
   public void setForceDarkOn(WebView view, boolean enabled) {
+    view.setSysDayOrNight(enabled);
     // Only Android 10+ support dark mode
-    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-      // Switch WebView dark mode
-      if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-        int forceDarkMode = enabled ? WebSettingsCompat.FORCE_DARK_ON : WebSettingsCompat.FORCE_DARK_OFF;
-        WebSettingsCompat.setForceDark(view.getSettings(), forceDarkMode);
-      }
-
-      // Set how WebView content should be darkened.
-      // PREFER_WEB_THEME_OVER_USER_AGENT_DARKENING:  checks for the "color-scheme" <meta> tag.
-      // If present, it uses media queries. If absent, it applies user-agent (automatic)
-      // More information about Force Dark Strategy can be found here:
-      // https://developer.android.com/reference/androidx/webkit/WebSettingsCompat#setForceDarkStrategy(android.webkit.WebSettings)
-      if (enabled && WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK_STRATEGY)) {
-        WebSettingsCompat.setForceDarkStrategy(view.getSettings(), WebSettingsCompat.DARK_STRATEGY_PREFER_WEB_THEME_OVER_USER_AGENT_DARKENING);
-      }
-    }
+//    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+//      // Switch WebView dark mode
+//      if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+//        int forceDarkMode = enabled ? WebSettingsCompat.FORCE_DARK_ON : WebSettingsCompat.FORCE_DARK_OFF;
+//        WebSettingsCompat.setForceDark(view.getSettings(), forceDarkMode);
+//      }
+//
+//      // Set how WebView content should be darkened.
+//      // PREFER_WEB_THEME_OVER_USER_AGENT_DARKENING:  checks for the "color-scheme" <meta> tag.
+//      // If present, it uses media queries. If absent, it applies user-agent (automatic)
+//      // More information about Force Dark Strategy can be found here:
+//      // https://developer.android.com/reference/androidx/webkit/WebSettingsCompat#setForceDarkStrategy(android.webkit.WebSettings)
+//      if (enabled && WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK_STRATEGY)) {
+//        WebSettingsCompat.setForceDarkStrategy(view.getSettings(), WebSettingsCompat.DARK_STRATEGY_PREFER_WEB_THEME_OVER_USER_AGENT_DARKENING);
+//      }
+//    }
   }
 
   @ReactProp(name = "minimumFontSize")
@@ -678,9 +684,9 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
   }
 
   @Override
-  protected void addEventEmitters(ThemedReactContext reactContext, WebView view) {
+  protected void addEventEmitters(ThemedReactContext reactContext, H5WrapperWebView view) {
     // Do not register default touch emitter and let WebView implementation handle touches
-    view.setWebViewClient(new RNCWebViewClient());
+    view.setHFWebViewClient(new RNCWebViewClient());
   }
 
   @Override
@@ -723,7 +729,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
   }
 
   @Override
-  public void receiveCommand(@NonNull WebView root, String commandId, @Nullable ReadableArray args) {
+  public void receiveCommand(@NonNull H5WrapperWebView root, String commandId, @Nullable ReadableArray args) {
     switch (commandId) {
       case "goBack":
         root.goBack();
@@ -786,7 +792,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
   }
 
   @Override
-  public void onDropViewInstance(WebView webView) {
+  public void onDropViewInstance(H5WrapperWebView webView) {
     super.onDropViewInstance(webView);
     ((ThemedReactContext) webView.getContext()).removeLifecycleEventListener((RNCWebView) webView);
     ((RNCWebView) webView).cleanupCallbacksAndDestroy();
@@ -797,7 +803,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     return reactContext.getNativeModule(RNCWebViewModule.class);
   }
 
-  protected void setupWebChromeClient(ReactContext reactContext, WebView webView) {
+  protected <T extends H5WrapperWebView> void setupWebChromeClient(ReactContext reactContext, T webView) {
     Activity activity = reactContext.getCurrentActivity();
 
     if (mAllowsFullscreenVideo && activity != null) {
@@ -810,7 +816,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
         }
 
         @Override
-        public void onShowCustomView(View view, CustomViewCallback callback) {
+        public void onShowCustomView(View view, IX5WebChromeClient.CustomViewCallback callback) {
           if (mVideoView != null) {
             callback.onCustomViewHidden();
             return;
@@ -883,7 +889,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
         }
       };
 
-      webView.setWebChromeClient(mWebChromeClient);
+      webView.setHFWebChromeClient(mWebChromeClient);
     } else {
       if (mWebChromeClient != null) {
         mWebChromeClient.onHideCustomView();
@@ -896,11 +902,11 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
         }
       };
 
-      webView.setWebChromeClient(mWebChromeClient);
+      webView.setHFWebChromeClient(mWebChromeClient);
     }
   }
 
-  protected static class RNCWebViewClient extends WebViewClient {
+  protected static class RNCWebViewClient extends HFWebViewClient {
 
     protected boolean mLastLoadFailed = false;
     protected @Nullable
@@ -1036,22 +1042,22 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
 
         // https://developer.android.com/reference/android/net/http/SslError.html
         switch (code) {
-          case SslError.SSL_DATE_INVALID:
+          case android.net.http.SslError.SSL_DATE_INVALID:
             description = "The date of the certificate is invalid";
             break;
-          case SslError.SSL_EXPIRED:
+          case android.net.http.SslError.SSL_EXPIRED:
             description = "The certificate has expired";
             break;
-          case SslError.SSL_IDMISMATCH:
+          case android.net.http.SslError.SSL_IDMISMATCH:
             description = "Hostname mismatch";
             break;
-          case SslError.SSL_INVALID:
+          case android.net.http.SslError.SSL_INVALID:
             description = "A generic error occurred";
             break;
-          case SslError.SSL_NOTYETVALID:
+          case android.net.http.SslError.SSL_NOTYETVALID:
             description = "The certificate is not yet valid";
             break;
-          case SslError.SSL_UNTRUSTED:
+          case android.net.http.SslError.SSL_UNTRUSTED:
             description = "The certificate authority is not trusted";
             break;
           default:
@@ -1190,7 +1196,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     }
   }
 
-  protected static class RNCWebChromeClient extends WebChromeClient implements LifecycleEventListener {
+  protected static class RNCWebChromeClient extends HFWebChromeClient implements LifecycleEventListener {
     protected static final FrameLayout.LayoutParams FULLSCREEN_LAYOUT_PARAMS = new FrameLayout.LayoutParams(
       LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, Gravity.CENTER);
 
@@ -1209,7 +1215,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     protected View mWebView;
 
     protected View mVideoView;
-    protected WebChromeClient.CustomViewCallback mCustomViewCallback;
+    protected IX5WebChromeClient.CustomViewCallback mCustomViewCallback;
 
     /*
      * - Permissions -
@@ -1223,7 +1229,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     protected List<String> grantedPermissions;
 
     // Webview geolocation permission callback
-    protected GeolocationPermissions.Callback geolocationPermissionCallback;
+    protected GeolocationPermissionsCallback geolocationPermissionCallback;
     // Webview geolocation permission origin callback
     protected String geolocationPermissionOrigin;
 
@@ -1324,7 +1330,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
 
 
     @Override
-    public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+    public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissionsCallback callback) {
 
       if (ContextCompat.checkSelfPermission(mReactContext, Manifest.permission.ACCESS_FINE_LOCATION)
         != PackageManager.PERMISSION_GRANTED) {
@@ -1455,7 +1461,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
       getModule(mReactContext).startPhotoPickerIntent(filePathCallback, "");
     }
 
-    protected void openFileChooser(ValueCallback<Uri> filePathCallback, String acceptType, String capture) {
+    public void openFileChooser(ValueCallback<Uri> filePathCallback, String acceptType, String capture) {
       getModule(mReactContext).startPhotoPickerIntent(filePathCallback, acceptType);
     }
 
@@ -1493,7 +1499,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
    * Subclass of {@link WebView} that implements {@link LifecycleEventListener} interface in order
    * to call {@link WebView#destroy} on activity destroy event and also to clear the client
    */
-  protected static class RNCWebView extends WebView implements LifecycleEventListener {
+  protected static class RNCWebView extends H5WrapperWebView implements LifecycleEventListener {
     protected @Nullable
     String injectedJS;
     protected @Nullable
@@ -1526,7 +1532,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
      * Reactive Native needed for access to ReactNative internal system functionality
      */
     public RNCWebView(ThemedReactContext reactContext) {
-      super(reactContext);
+      super(reactContext, null);
       this.createCatalystInstance();
       progressChangedFilter = new ProgressChangedFilter();
     }
@@ -1590,9 +1596,18 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
       }
     }
 
+//    @Override
+//    public void setWebViewClient(WebViewClient client) {
+//      super.setWebViewClient(client);
+//      if (client instanceof RNCWebViewClient) {
+//        mRNCWebViewClient = (RNCWebViewClient) client;
+//        mRNCWebViewClient.setProgressChangedFilter(progressChangedFilter);
+//      }
+//    }
+
     @Override
-    public void setWebViewClient(WebViewClient client) {
-      super.setWebViewClient(client);
+    public void setHFWebViewClient(@Nullable HFWebViewClient client) {
+      super.setHFWebViewClient(client);
       if (client instanceof RNCWebViewClient) {
         mRNCWebViewClient = (RNCWebViewClient) client;
         mRNCWebViewClient.setProgressChangedFilter(progressChangedFilter);
@@ -1600,10 +1615,19 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     }
 
     WebChromeClient mWebChromeClient;
+//    @Override
+//    public void setWebChromeClient(WebChromeClient client) {
+//      this.mWebChromeClient = client;
+//      super.setWebChromeClient(client);
+//      if (client instanceof RNCWebChromeClient) {
+//        ((RNCWebChromeClient) client).setProgressChangedFilter(progressChangedFilter);
+//      }
+//    }
+
     @Override
-    public void setWebChromeClient(WebChromeClient client) {
+    public void setHFWebChromeClient(HFWebChromeClient client) {
       this.mWebChromeClient = client;
-      super.setWebChromeClient(client);
+      super.setHFWebChromeClient(client);
       if (client instanceof RNCWebChromeClient) {
         ((RNCWebChromeClient) client).setProgressChangedFilter(progressChangedFilter);
       }
@@ -1771,7 +1795,7 @@ public class RNCWebViewManager extends SimpleViewManager<WebView> {
     }
 
     protected void cleanupCallbacksAndDestroy() {
-      setWebViewClient(null);
+      setHFWebViewClient(null);
       destroy();
     }
 
